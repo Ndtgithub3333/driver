@@ -2,17 +2,16 @@
 
 ## Mô tả tổng quan
 
-Dự án này triển khai một **Virtual Network Driver** cho Linux kernel, tạo ra hai interface mạng ảo (`vnet0` và `vnet1`) có khả năng giao tiếp với nhau thông qua một kênh truyền dữ liệu nội bộ. Driver được tích hợp với tính năng bắt và phân tích gói tin thông qua Netfilter hooks, cung cấp khả năng giám sát và phân tích traffic mạng chi tiết.
+Dự án này triển khai một **Virtual Network Driver** cho Linux kernel, tạo ra hai interface mạng ảo (`vnet0` và `vnet1`) có khả năng giao tiếp với nhau thông qua một kênh truyền dữ liệu nội bộ. Driver được tích hợp với tính năng bắt và phân tích gói tin thông qua Netfilter hooks.
 
 ## ✨ Tính năng chính
 
-- **🌐 Virtual Network Interfaces**: Tạo hai interface mạng ảo `vnet0` và `vnet1` hoạt động độc lập
-- **🔄 Packet Forwarding**: Chuyển tiếp gói tin tự động giữa hai interface với cơ chế peer-to-peer
-- **📊 Packet Capture**: Bắt và lưu trữ thông tin chi tiết về các gói tin đi qua hệ thống
-- **🔍 Netfilter Integration**: Tích hợp với Netfilter hooks để monitor traffic real-time
+- **🌐 Virtual Network Interfaces**: Tạo hai interface mạng ảo `vnet0` và `vnet1`
+- **🔄 Packet Forwarding**: Chuyển tiếp gói tin tự động giữa hai interface
+- **📊 Packet Capture**: Bắt và lưu trữ thông tin chi tiết về các gói tin
+- **🔍 Netfilter Integration**: Tích hợp với Netfilter hooks để monitor traffic
 - **📈 Statistics**: Cung cấp thống kê chi tiết qua `/proc/vnet_capture`
-- **📝 Kernel Logging**: Ghi log chi tiết các hoạt động vào kernel log để debug
-- **🧪 Automated Testing**: Script kiểm thử tự động đầy đủ
+- **📝 Kernel Logging**: Ghi log các hoạt động vào kernel log
 
 ## 🗂️ Cấu trúc dự án
 
@@ -30,39 +29,23 @@ driver/
 
 ## 🛠️ Yêu cầu hệ thống
 
-### Phần cứng
-- **RAM**: Tối thiểu 1GB (khuyến nghị 2GB+)
-- **CPU**: Bất kỳ kiến trúc x86_64
-
-### Phần mềm
-- **Hệ điều hành**: Linux với kernel version 4.15+ (đã test trên Ubuntu 18.04+, CentOS 7+)
+- **Hệ điều hành**: Linux với kernel version 4.15+
 - **Quyền hạn**: Root privileges để load/unload kernel modules
 - **Tools cần thiết**:
-  - `build-essential` (GCC compiler, make)
-  - `linux-headers-$(uname -r)` - Linux kernel headers
-  - `netcat-openbsd` - cho việc kiểm thử kết nối TCP/UDP
-  - `iproute2` - công cụ quản lý network
+  - GCC compiler
+  - Linux kernel headers
+  - Make utility
+  - netcat (nc) cho việc kiểm thử
 
-### Cài đặt dependencies trên Ubuntu/Debian:
+### Cài đặt dependencies trên Ubuntu 20.04:
 ```bash
 sudo apt-get update
-sudo apt-get install build-essential linux-headers-$(uname -r) netcat-openbsd iproute2
-```
-
-### Cài đặt dependencies trên CentOS/RHEL:
-```bash
-sudo yum install gcc make kernel-devel-$(uname -r) nc iproute
+sudo apt-get install build-essential linux-headers-$(uname -r) netcat-openbsd
 ```
 
 ## 🚀 Cài đặt và sử dụng
 
-### 1. Clone repository
-```bash
-git clone https://github.com/Ndtgithub3333/driver.git
-cd driver
-```
-
-### 2. Biên dịch
+### 1. Biên dịch
 
 ```bash
 # Xem các lệnh có sẵn
@@ -77,22 +60,14 @@ make
 cd ..
 ```
 
-### 3. Kiểm thử tự động (Khuyến nghị)
+### 2. Kiểm thử tự động
 
 ```bash
 # Chạy script kiểm thử đầy đủ (cần quyền root)
 sudo ./test_driver.sh
 ```
 
-Script sẽ tự động:
-- ✅ Gỡ bỏ modules cũ nếu có
-- ✅ Biên dịch và load modules mới
-- ✅ Cấu hình network interfaces
-- ✅ Kiểm tra kết nối TCP
-- ✅ Hiển thị thống kê packet capture
-- ✅ Cleanup sau khi hoàn thành
-
-### 4. Sử dụng thủ công
+### 3. Sử dụng thủ công
 
 #### Load modules:
 ```bash
@@ -117,33 +92,23 @@ ip addr show vnet1
 
 #### Kiểm tra kết nối:
 
-**Terminal 1 - Chạy server:**
+**Terminal 1 - Server:**
 ```bash
-# TCP server listening trên vnet1
 nc -l -k -s 192.168.10.2 -p 12345
 ```
 
-**Terminal 2 - Chạy client:**
+**Terminal 2 - Client:**
 ```bash
-# Gửi dữ liệu từ vnet0 đến vnet1
 echo "Hello Virtual Network!" | nc -s 192.168.10.1 192.168.10.2 12345
 ```
 
 #### Xem thống kê packet capture:
 ```bash
-# Hiển thị thống kê real-time
 cat /proc/vnet_capture
-
-# Theo dõi liên tục
-watch cat /proc/vnet_capture
 ```
 
 #### Xem kernel logs:
 ```bash
-# Xem logs real-time
-sudo dmesg -w | grep vnet
-
-# Xem logs đã ghi
 dmesg | grep vnet
 ```
 
@@ -158,69 +123,60 @@ sudo rmmod vnet_driver
 ### 1. Virtual Network Driver (src/vnet_driver.c)
 
 #### Cấu trúc dữ liệu chính:
-- **`struct vnet_priv`**: Lưu thông tin private của mỗi interface
-  - Pointer đến peer device
-  - Network statistics
-  - Lock mechanisms
-- **`struct captured_packet`**: Lưu thông tin gói tin đã bắt được
-  - Timestamp
-  - IP addresses (source/destination)
-  - Ports (source/destination)
-  - Protocol type
-  - Packet length
+- `struct vnet_priv`: Lưu thông tin private của mỗi interface
+- `struct captured_packet`: Lưu thông tin gói tin đã bắt được
 
 #### Các hàm chính:
-- **`vnet_open()`**: Mở interface và khởi tạo transmit queue
-- **`vnet_close()`**: Đóng interface và dừng transmit queue
-- **`vnet_start_xmit()`**: Xử lý việc truyền gói tin giữa hai interface
-- **`vnet_get_stats()`**: Cung cấp thống kê network device
+- `vnet_open()`: Mở interface và khởi tạo transmit queue
+- `vnet_close()`: Đóng interface và dừng transmit queue
+- `vnet_start_xmit()`: Xử lý việc truyền gói tin giữa hai interface
+- `vnet_get_stats()`: Cung cấp thống kê network device
 
 #### Cơ chế hoạt động:
-1. **Khởi tạo**: Tạo hai network device ảo với quan hệ peer-to-peer
-2. **Packet Transmission**: Khi gói tin được gửi từ một interface, nó sẽ được copy và chuyển đến interface đối tác
-3. **Packet Reception**: Gói tin được xử lý và forward lên network stack của interface nhận
-4. **Statistics Update**: Thống kê được cập nhật cho cả sender và receiver
+1. Tạo hai network device ảo với quan hệ peer-to-peer
+2. Khi gói tin được gửi từ một interface, nó sẽ được copy và chuyển đến interface đối tác
+3. Gói tin được xử lý và forward lên network stack của interface nhận
+4. Thống kê được cập nhật cho cả sender và receiver
 
 ### 2. Netfilter Module (src/vnet_netfilter.c)
 
 #### Chức năng:
-- **Hook Integration**: Hook vào INPUT và OUTPUT chains của netfilter
-- **Packet Analysis**: Bắt và phân tích các gói tin đi qua virtual interfaces
-- **Data Storage**: Lưu trữ thông tin chi tiết về mỗi gói tin trong kernel memory
+- Hook vào INPUT và OUTPUT chains của netfilter
+- Bắt và phân tích các gói tin đi qua virtual interfaces
+- Lưu trữ thông tin chi tiết về mỗi gói tin
 
 #### Thông tin được capture:
-- **Timestamp**: Thời gian chính xác khi gói tin được bắt
-- **Network Layer**: Source và Destination IP addresses
-- **Transport Layer**: Source và Destination Ports (TCP/UDP)
-- **Protocol**: Protocol type (TCP, UDP, ICMP, etc.)
-- **Size**: Packet length in bytes
-- **Interface**: Interface name (vnet0/vnet1)
-- **Direction**: Traffic direction (IN/OUT)
+- Timestamp
+- Source và Destination IP
+- Source và Destination Port (TCP/UDP)
+- Protocol type
+- Packet length
+- Interface name
+- Direction (IN/OUT)
 
 #### Proc Interface:
-- **File**: `/proc/vnet_capture`
-- **Format**: Formatted table với các cột thông tin chi tiết
-- **Real-time**: Cập nhật real-time khi có packet mới
+- File: `/proc/vnet_capture`
+- Hiển thị thống kê và danh sách gói tin đã bắt được
 
 ### 3. Header File (include/vnet_driver.h)
 
-**Chứa định nghĩa:**
-- Constants và macros for configuration
-- Cấu trúc dữ liệu shared giữa các modules
-- Function prototypes for inter-module communication
-- Global variables và shared memory structures
+Chứa định nghĩa:
+- Constants và macros
+- Cấu trúc dữ liệu
+- Function prototypes
+- Global variables
 
 ## 📋 Script kiểm thử (test_driver.sh)
 
-Script tự động hóa hoàn toàn quá trình testing:
+Script tự động hóa quá trình testing:
 
-1. **Cleanup**: Gỡ bỏ modules cũ nếu tồn tại
-2. **Build**: Biên dịch modules mới
-3. **Load**: Load modules vào kernel
-4. **Configure**: Cấu hình network interfaces
-5. **Test**: Kiểm tra kết nối TCP/UDP
-6. **Monitor**: Hiển thị thống kê packet capture
-7. **Cleanup**: Dọn dẹp resources
+1. Gỡ bỏ modules cũ nếu tồn tại
+2. Biên dịch modules mới
+3. Load modules vào kernel
+4. Cấu hình network interfaces
+5. Kiểm tra kết nối TCP
+6. Hiển thị thống kê packet capture
+7. Cleanup resources
 
 ## 🐛 Troubleshooting
 
@@ -249,14 +205,6 @@ sudo rmmod vnet_netfilter vnet_driver
 sudo insmod src/vnet_driver.ko src/vnet_netfilter.ko
 ```
 
-#### 4. "Cannot allocate memory"
-```bash
-# Nguyên nhân: Thiếu RAM
-# Giải pháp: Giải phóng memory hoặc thêm swap
-free -h
-sudo swapon --show
-```
-
 ### Debug Commands:
 ```bash
 # Kiểm tra modules đã load
@@ -267,56 +215,11 @@ dmesg | tail -20
 
 # Kiểm tra network interfaces
 ip link show | grep vnet
-
-# Monitor system resources
-top
-free -h
 ```
-
-## 📊 Performance và Benchmarks
-
-### Thông số đo được:
-- **Throughput**: ~1Gbps với packets 1500 bytes
-- **Latency**: <1ms trong local transmission
-- **Memory Usage**: ~2MB per 1000 captured packets
-- **CPU Usage**: <5% trên single core 2GHz
-
-### Giới hạn:
-- **Max Interfaces**: 2 (vnet0, vnet1)
-- **Max Captured Packets**: 10,000 (configurable)
-- **Max Packet Size**: 1500 bytes (standard MTU)
-
-## 🔒 Bảo mật
-
-### Considerations:
-- Module chạy ở kernel space với full privileges
-- Không validate input từ userspace
-- Chỉ sử dụng trong môi trường test/development
-- Không khuyến nghị deploy trên production systems
-
-## 🤝 Đóng góp
-
-1. Fork repository
-2. Tạo feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add some amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Tạo Pull Request
-
-## 📝 License
-
-Distributed under the MIT License. See `LICENSE` file for more information.
 
 ## 👨‍💻 Tác giả
 
-- **Ndtgithub3333** - *Initial work* - [Ndtgithub3333](https://github.com/Ndtgithub3333)
-
-## 🙏 Acknowledgments
-
-- Linux Kernel Development Community
-- Netfilter Project
-- Virtual Network Device Implementations
-
----
+- **Ndtgithub3333** - [https://github.com/Ndtgithub3333](https://github.com/Ndtgithub3333)
 
 ## 📞 Liên hệ
 
