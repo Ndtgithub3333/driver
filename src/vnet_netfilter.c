@@ -152,28 +152,29 @@ static int proc_show(struct seq_file *m, void *v)
     int i, count;
     struct packet_info *pkt;
     unsigned long flags;
-    char protocol_name[16];
-    
-    seq_printf(m, "=== Virtual Network Packet Capture Statistics ===\n");
+    char protocol_name[8];
+    char src_ip_str[16], dst_ip_str[16];
+
+    seq_puts(m, "============== Virtual Network Packet Capture Statistics ==============\n");
     seq_printf(m, "Total packets captured: %d\n", total_packets);
     seq_printf(m, "Current buffer size: %d packets\n", 
                (total_packets > MAX_CAPTURED_PACKETS) ? MAX_CAPTURED_PACKETS : total_packets);
-    seq_printf(m, "\n");
-    
-    seq_printf(m, "%-12s %-5s %-15s %-6s %-15s %-6s %-8s %-6s %-10s\n",
-               "Timestamp", "Dir", "Src IP", "Port", "Dst IP", "Port", "Protocol", "Length", "Interface");
-    seq_printf(m, "%-12s %-5s %-15s %-6s %-15s %-6s %-8s %-6s %-10s\n",
-               "------------", "-----", "---------------", "------", "---------------", "------", "--------", "------", "----------");
-    
+    seq_puts(m, "\n");
+
+    // Header: | Timestamp  | Dir |   Source IP   | SPort |   Dest IP    | DPort | Proto | Len  |   Iface   |
+    seq_puts(m, "+------------+-----+-----------------+-------+-----------------+-------+-------+------+-----------+\n");
+    seq_puts(m, "| Timestamp  | Dir |   Source IP     | SPort |     Dest IP     | DPort | Proto | Len  |   Iface   |\n");
+    seq_puts(m, "+------------+-----+-----------------+-------+-----------------+-------+-------+------+-----------+\n");
+
     spin_lock_irqsave(&capture_lock, flags);
-    
+
     count = (total_packets > MAX_CAPTURED_PACKETS) ? MAX_CAPTURED_PACKETS : total_packets;
-    
+
     for (i = 0; i < count; i++) {
         int idx = (packet_index - count + i + MAX_CAPTURED_PACKETS) % MAX_CAPTURED_PACKETS;
         pkt = &captured_packets[idx];
-        
-        /* Chuyển đổi protocol number thành tên */
+
+        // Protocol as string
         switch (pkt->protocol) {
             case IPPROTO_TCP:
                 strcpy(protocol_name, "TCP");
@@ -185,24 +186,32 @@ static int proc_show(struct seq_file *m, void *v)
                 strcpy(protocol_name, "ICMP");
                 break;
             default:
-                snprintf(protocol_name, sizeof(protocol_name), "%d", pkt->protocol);
+                snprintf(protocol_name, sizeof(protocol_name), "%u", pkt->protocol);
                 break;
         }
-        
-        seq_printf(m, "%-12lu %-5s %pI4 %-6d %pI4 %-6d %-8s %-6d %-10s\n",
-                   pkt->timestamp,
-                   pkt->direction,
-                   &pkt->src_ip,
-                   pkt->src_port,
-                   &pkt->dst_ip,
-                   pkt->dst_port,
-                   protocol_name,
-                   pkt->length,
-                   pkt->interface);
+
+        snprintf(src_ip_str, sizeof(src_ip_str), "%pI4", &pkt->src_ip);
+        snprintf(dst_ip_str, sizeof(dst_ip_str), "%pI4", &pkt->dst_ip);
+
+        // Căn chỉnh bảng
+        seq_printf(m,
+            "| %10lu | %-3s | %15s | %5u | %15s | %5u | %5s | %4u | %-9s |\n",
+            pkt->timestamp,
+            pkt->direction,
+            src_ip_str,
+            pkt->src_port,
+            dst_ip_str,
+            pkt->dst_port,
+            protocol_name,
+            pkt->length,
+            pkt->interface
+        );
     }
-    
+
     spin_unlock_irqrestore(&capture_lock, flags);
-    
+
+    seq_puts(m, "+------------+-----+---------------+-------+---------------+-------+-------+------+-----------+\n");
+
     return 0;
 }
 
