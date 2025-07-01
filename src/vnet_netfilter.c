@@ -153,6 +153,7 @@ static int proc_show(struct seq_file *m, void *v)
     struct packet_info *pkt;
     unsigned long flags;
     char protocol_name[16];
+    char src_ip_str[16], dst_ip_str[16];
     
     seq_printf(m, "=== Virtual Network Packet Capture Statistics ===\n");
     seq_printf(m, "Total packets captured: %d\n", total_packets);
@@ -160,10 +161,11 @@ static int proc_show(struct seq_file *m, void *v)
                (total_packets > MAX_CAPTURED_PACKETS) ? MAX_CAPTURED_PACKETS : total_packets);
     seq_printf(m, "\n");
     
-    seq_printf(m, "%-12s %-5s %-15s %-6s %-15s %-6s %-8s %-6s %-10s\n",
-               "Timestamp", "Dir", "Src IP", "Port", "Dst IP", "Port", "Protocol", "Length", "Interface");
-    seq_printf(m, "%-12s %-5s %-15s %-6s %-15s %-6s %-8s %-6s %-10s\n",
-               "------------", "-----", "---------------", "------", "---------------", "------", "--------", "------", "----------");
+    /* Beautiful table header with proper spacing and ASCII borders */
+    seq_printf(m, "+-------------+-----+----------------+------+----------------+------+---------+------+------------+\n");
+    seq_printf(m, "| %-11s | %-3s | %-14s | %-4s | %-14s | %-4s | %-7s | %-4s | %-10s |\n",
+               "Timestamp", "Dir", "Source IP", "Port", "Dest IP", "Port", "Protocol", "Len", "Interface");
+    seq_printf(m, "+-------------+-----+----------------+------+----------------+------+---------+------+------------+\n");
     
     spin_lock_irqsave(&capture_lock, flags);
     
@@ -189,12 +191,17 @@ static int proc_show(struct seq_file *m, void *v)
                 break;
         }
         
-        seq_printf(m, "%-12lu %-5s %pI4 %-6d %pI4 %-6d %-8s %-6d %-10s\n",
+        /* Format IP addresses into fixed-width strings */
+        snprintf(src_ip_str, sizeof(src_ip_str), "%pI4", &pkt->src_ip);
+        snprintf(dst_ip_str, sizeof(dst_ip_str), "%pI4", &pkt->dst_ip);
+        
+        /* Display table row with perfect alignment */
+        seq_printf(m, "| %11lu | %-3s | %-14s | %4d | %-14s | %4d | %-7s | %4d | %-10s |\n",
                    pkt->timestamp,
                    pkt->direction,
-                   &pkt->src_ip,
+                   src_ip_str,
                    pkt->src_port,
-                   &pkt->dst_ip,
+                   dst_ip_str,
                    pkt->dst_port,
                    protocol_name,
                    pkt->length,
@@ -202,6 +209,9 @@ static int proc_show(struct seq_file *m, void *v)
     }
     
     spin_unlock_irqrestore(&capture_lock, flags);
+    
+    /* Close the table */
+    seq_printf(m, "+-------------+-----+----------------+------+----------------+------+---------+------+------------+\n");
     
     return 0;
 }
